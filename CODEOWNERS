@@ -1,0 +1,11 @@
+# Org-wide default code owners. Individual repos can override with their own CODEOWNERS.
+# Syntax: https://docs.github.com/articles/about-code-owners
+
+# Default: Chinedum reviews everything under Milton-Group/.github
+*                 @chinedum-egbosimba
+
+# Security policy changes always require owner review
+/SECURITY.md      @chinedum-egbosimba
+
+# Reusable workflows are platform-critical — protect against accidental changes
+/.github/workflows/  @chinedum-egbosimba

@@ -1,0 +1,60 @@
+name: Reusable Node CI
+
+# Reusable Node CI workflow. Consumed by Milton-Group repos via:
+#   uses: Milton-Group/.github/.github/workflows/node-ci.yml@v1
+#
+# Standardizes on npm for V1. pnpm/yarn support deferred until a consumer actually needs it;
+# the previous draft used ${{ inputs.package-manager }} ci which is broken for pnpm
+# (pnpm ci is not a valid command) and yarn. Keep it simple, add flexibility when earned.
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version"
+        type: string
+        default: "22"
+      working-directory:
+        description: "Path to the Node project root (for monorepos)"
+        type: string
+        default: "."
+      skip-typecheck:
+        description: "Skip the typecheck step (for repos without TypeScript)"
+        type: boolean
+        default: false
+      skip-test:
+        description: "Skip the test step (for repos with no test script yet)"
+        type: boolean
+        default: false
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Typecheck
+        if: ${{ !inputs.skip-typecheck }}
+        run: npm run typecheck --if-present
+
+      - name: Test
+        if: ${{ !inputs.skip-test }}
+        run: npm test --if-present
