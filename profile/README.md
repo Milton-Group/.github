@@ -1,6 +1,6 @@
 # Milton Group
 
-Milton is a holding group for a portfolio of AI-native software products — ERPNext infrastructure, fashion PLM, ecolodge research, and the platform tooling that keeps them coherent.
+Milton partners with makers and builders to replace what depletes with what sustains — in materials, in models, in practice.
 
 **Make · Thrive · Build.**
 
