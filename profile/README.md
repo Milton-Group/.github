@@ -8,7 +8,7 @@ Milton partners with makers and builders to replace what depletes with what sust
 
 Start with [`Milton-Group/claude-template`](https://github.com/Milton-Group/claude-template) and the onboarding runbook in its `docs/ONBOARDING.md`. Every new repo inherits from that baseline.
 
-Remote development happens in [coder.milton.co](https://coder.milton.co) — click the **Open in Coder** badge on any repo's README.
+Remote development happens in [coder.milton.co](https://coder.milton.co). Sign in with your Milton-Group GitHub account and create a workspace from the `milton-ec2` template.
 
 ## For visitors
 
