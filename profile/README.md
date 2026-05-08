@@ -13,7 +13,7 @@ Milton partners with makers and builders to replace what depletes with what sust
 | If you are… | Read |
 |---|---|
 | **A new engineer at Milton** | [Your first PR](https://github.com/Milton-Group/claude-template/blob/main/docs/ONBOARDING.md) — the engineering loop, EN + 中文 |
-| **Setting up your dev environment** (engineer or not) | [Coder setup](https://github.com/Milton-Group/infra/blob/main/docs/USER-ONBOARDING.md) — workspace + Claude Code, EN + 中文 |
+| **Setting up your dev environment** (engineer or not) | [Coder setup](https://dev-onboarding.milton.co/) — workspace + Claude Code, EN + 中文 |
 | **Working in a Milton repo** | [Conventions](https://github.com/Milton-Group/claude-template/blob/main/docs/CONVENTIONS.md) — commits, branches, PRs |
 | **Operating Milton infra** | [Architecture](https://github.com/Milton-Group/infra/blob/main/ARCHITECTURE.md) · [Incident response](https://github.com/Milton-Group/infra/blob/main/docs/INCIDENT-RESPONSE.md) |
 | **A visitor** | Our public site at [milton.co](https://milton.co) |
@@ -50,7 +50,7 @@ Milton 与 makers 和 builders 合作,用可持续的方式替换被消耗的事
 | 如果你是… | 阅读 |
 |---|---|
 | **Milton 的新工程师** | [第一次提交 PR](https://github.com/Milton-Group/claude-template/blob/main/docs/ONBOARDING.md) —— 开发循环,EN + 中文 |
-| **正在设置开发环境**(无论是否工程师) | [Coder 设置](https://github.com/Milton-Group/infra/blob/main/docs/USER-ONBOARDING.md) —— 工作区 + Claude Code,EN + 中文 |
+| **正在设置开发环境**(无论是否工程师) | [Coder 设置](https://dev-onboarding.milton.co/) —— 工作区 + Claude Code,EN + 中文 |
 | **在 Milton 仓库中工作** | [约定](https://github.com/Milton-Group/claude-template/blob/main/docs/CONVENTIONS.md) —— 提交、分支、PR |
 | **运维 Milton 基础设施** | [架构](https://github.com/Milton-Group/infra/blob/main/ARCHITECTURE.md) · [事件响应](https://github.com/Milton-Group/infra/blob/main/docs/INCIDENT-RESPONSE.md) |
 | **访客** | 公开网站 [milton.co](https://milton.co) |
