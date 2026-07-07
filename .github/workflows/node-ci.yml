@@ -3,17 +3,23 @@ name: Reusable Node CI
 # Reusable Node CI workflow. Consumed by Milton-Group repos via:
 #   uses: Milton-Group/.github/.github/workflows/node-ci.yml@v1
 #
-# Supports npm (default) and yarn, selected via the `package-manager` input.
-# npm stays the default so existing consumers are byte-for-byte unaffected. yarn
-# support was added for mira-app — the first consumer that actually needs it
-# (see MILTON-722), which retires the earlier "yarn deferred until a consumer
-# needs it" note. Callers pin a tag (e.g. @v1) or a SHA, so this change only
+# Supports npm (default), yarn, and pnpm, selected via the `package-manager`
+# input. npm stays the default so existing consumers are byte-for-byte
+# unaffected. yarn support was added for mira-app — the first consumer that
+# actually needed it (see MILTON-722). pnpm support follows as a MILTON-722
+# follow-up; its first consumer is also mira-app, after the monorepo
+# restructure. Callers pin a tag (e.g. @v1) or a SHA, so this change only
 # reaches a consumer when it bumps the ref it points at.
 #
-# pnpm is still deferred until a consumer needs it. Note the naive
-# `${{ inputs.package-manager }} ci` pattern is broken (`pnpm ci` / `yarn ci` are
-# not valid commands), so each manager gets its own explicit install + script
-# steps below rather than a single templated command.
+# The naive `${{ inputs.package-manager }} ci` pattern is broken (`pnpm ci` /
+# `yarn ci` are not valid commands), so each manager gets its own explicit
+# install + script steps below rather than a single templated command.
+#
+# pnpm additionally REQUIRES the consuming repo to set the `packageManager`
+# field in its package.json: pnpm/action-setup@v4 is invoked without an explicit
+# version and reads the pnpm version from that field. The validation step below
+# fails fast with a clear error when package-manager=pnpm and the field is
+# absent, rather than letting action-setup emit a cryptic failure.
 
 on:
   workflow_call:
@@ -27,7 +33,7 @@ on:
         type: string
         default: "."
       package-manager:
-        description: "Package manager to use. Allowed values: npm | yarn (default: npm)"
+        description: "Package manager to use. Allowed values: npm | yarn | pnpm (default: npm)"
         type: string
         default: "npm"
       skip-typecheck:
@@ -48,37 +54,74 @@ jobs:
 
     steps:
       - name: Validate package-manager input
-        if: ${{ inputs.package-manager != 'npm' && inputs.package-manager != 'yarn' }}
+        if: ${{ inputs.package-manager != 'npm' && inputs.package-manager != 'yarn' && inputs.package-manager != 'pnpm' }}
         working-directory: .
+        env:
+          PACKAGE_MANAGER: ${{ inputs.package-manager }}
         run: |
-          echo "::error::package-manager must be exactly 'npm' or 'yarn', got '${{ inputs.package-manager }}'"
+          printf '::error::package-manager must be exactly npm, yarn, or pnpm, got %s\n' "$PACKAGE_MANAGER"
           exit 1
 
       - name: Checkout
         uses: actions/checkout@v4
 
+      # pnpm/action-setup reads the pnpm version from package.json's
+      # `packageManager` field (no explicit version is pinned here). pnpm
+      # projects keep that field and pnpm-lock.yaml at the WORKSPACE ROOT,
+      # which this workflow requires to be the repo root — working-directory
+      # still controls where scripts run (pnpm resolves the workspace upward).
+      # Fail fast with an actionable message when the field is missing or
+      # doesn't pin pnpm, before action-setup emits a less obvious error.
+      # `node -p` makes a malformed/unreadable package.json FAIL the step
+      # rather than silently pass.
+      - name: Validate pnpm packageManager field
+        if: ${{ inputs.package-manager == 'pnpm' }}
+        working-directory: .
+        run: |
+          OK=$(node -p "/^pnpm@/.test(require('./package.json').packageManager || '')")
+          if [ "$OK" != "true" ]; then
+            echo "::error::package-manager=pnpm requires a repo-root package.json with a pnpm 'packageManager' field, e.g. \"packageManager\": \"pnpm@9.15.0\" (missing, not pnpm@<version>, or package.json unreadable)."
+            exit 1
+          fi
+
+      # pnpm path: install pnpm BEFORE setup-node so setup-node's `cache: pnpm`
+      # can resolve the pnpm store path (it shells out to `pnpm store path`).
+      # No version input — action-setup reads it from the repo-root
+      # package.json `packageManager` field (validated above). Third-party
+      # action pinned by commit SHA (org-wide blast radius via this reusable
+      # workflow).
+      - name: Setup pnpm
+        if: ${{ inputs.package-manager == 'pnpm' }}
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          package_json_file: package.json
+
+      # pnpm's lockfile lives at the workspace (repo) root, so its cache path
+      # is NOT prefixed with working-directory like npm/yarn.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: ${{ inputs.package-manager == 'yarn' && 'yarn' || 'npm' }}
-          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
+          cache: ${{ inputs.package-manager == 'yarn' && 'yarn' || inputs.package-manager == 'pnpm' && 'pnpm' || 'npm' }}
+          cache-dependency-path: ${{ inputs.package-manager == 'pnpm' && 'pnpm-lock.yaml' || format('{0}/{1}', inputs.working-directory, inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json') }}
 
-      # --- npm path (default; unchanged behavior for existing consumers) ---
+      # --- npm path (default) ---
+      # Guarded on `== 'npm'` (not `!= 'yarn'`) so pnpm no longer falls through
+      # into this path now that a third manager exists.
       - name: Install dependencies
-        if: ${{ inputs.package-manager != 'yarn' }}
+        if: ${{ inputs.package-manager == 'npm' }}
         run: npm ci
 
       - name: Lint
-        if: ${{ inputs.package-manager != 'yarn' }}
+        if: ${{ inputs.package-manager == 'npm' }}
         run: npm run lint --if-present
 
       - name: Typecheck
-        if: ${{ !inputs.skip-typecheck && inputs.package-manager != 'yarn' }}
+        if: ${{ !inputs.skip-typecheck && inputs.package-manager == 'npm' }}
         run: npm run typecheck --if-present
 
       - name: Test
-        if: ${{ !inputs.skip-test && inputs.package-manager != 'yarn' }}
+        if: ${{ !inputs.skip-test && inputs.package-manager == 'npm' }}
         run: npm test --if-present
 
       # --- yarn path ---
@@ -129,3 +172,23 @@ jobs:
           else
             echo "No test script in package.json; skipping (yarn has no --if-present)."
           fi
+
+      # --- pnpm path ---
+      # pnpm supports --if-present natively (unlike yarn v1), so the script
+      # steps need no package.json probe — an absent script is a clean no-op.
+      # skip-typecheck / skip-test guard composition matches the other paths.
+      - name: Install dependencies (pnpm)
+        if: ${{ inputs.package-manager == 'pnpm' }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint (pnpm)
+        if: ${{ inputs.package-manager == 'pnpm' }}
+        run: pnpm run lint --if-present
+
+      - name: Typecheck (pnpm)
+        if: ${{ !inputs.skip-typecheck && inputs.package-manager == 'pnpm' }}
+        run: pnpm run typecheck --if-present
+
+      - name: Test (pnpm)
+        if: ${{ !inputs.skip-test && inputs.package-manager == 'pnpm' }}
+        run: pnpm run test --if-present
