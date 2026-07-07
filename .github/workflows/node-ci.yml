@@ -177,18 +177,22 @@ jobs:
       # pnpm supports --if-present natively (unlike yarn v1), so the script
       # steps need no package.json probe — an absent script is a clean no-op.
       # skip-typecheck / skip-test guard composition matches the other paths.
+      # NOTE: `--if-present` must come BEFORE the script name for pnpm. Unlike
+      # npm, `pnpm run <script> --if-present` forwards the flag to the script
+      # (e.g. `turbo run lint --if-present` → "unexpected argument"), so the
+      # flag precedes the script name here.
       - name: Install dependencies (pnpm)
         if: ${{ inputs.package-manager == 'pnpm' }}
         run: pnpm install --frozen-lockfile
 
       - name: Lint (pnpm)
         if: ${{ inputs.package-manager == 'pnpm' }}
-        run: pnpm run lint --if-present
+        run: pnpm run --if-present lint
 
       - name: Typecheck (pnpm)
         if: ${{ !inputs.skip-typecheck && inputs.package-manager == 'pnpm' }}
-        run: pnpm run typecheck --if-present
+        run: pnpm run --if-present typecheck
 
       - name: Test (pnpm)
         if: ${{ !inputs.skip-test && inputs.package-manager == 'pnpm' }}
-        run: pnpm run test --if-present
+        run: pnpm run --if-present test
