@@ -3,9 +3,17 @@ name: Reusable Node CI
 # Reusable Node CI workflow. Consumed by Milton-Group repos via:
 #   uses: Milton-Group/.github/.github/workflows/node-ci.yml@v1
 #
-# Standardizes on npm for V1. pnpm/yarn support deferred until a consumer actually needs it;
-# the previous draft used ${{ inputs.package-manager }} ci which is broken for pnpm
-# (pnpm ci is not a valid command) and yarn. Keep it simple, add flexibility when earned.
+# Supports npm (default) and yarn, selected via the `package-manager` input.
+# npm stays the default so existing consumers are byte-for-byte unaffected. yarn
+# support was added for mira-app — the first consumer that actually needs it
+# (see MILTON-722), which retires the earlier "yarn deferred until a consumer
+# needs it" note. Callers pin a tag (e.g. @v1) or a SHA, so this change only
+# reaches a consumer when it bumps the ref it points at.
+#
+# pnpm is still deferred until a consumer needs it. Note the naive
+# `${{ inputs.package-manager }} ci` pattern is broken (`pnpm ci` / `yarn ci` are
+# not valid commands), so each manager gets its own explicit install + script
+# steps below rather than a single templated command.
 
 on:
   workflow_call:
@@ -18,6 +26,10 @@ on:
         description: "Path to the Node project root (for monorepos)"
         type: string
         default: "."
+      package-manager:
+        description: "Package manager to use. Allowed values: npm | yarn (default: npm)"
+        type: string
+        default: "npm"
       skip-typecheck:
         description: "Skip the typecheck step (for repos without TypeScript)"
         type: boolean
@@ -35,6 +47,13 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
 
     steps:
+      - name: Validate package-manager input
+        if: ${{ inputs.package-manager != 'npm' && inputs.package-manager != 'yarn' }}
+        working-directory: .
+        run: |
+          echo "::error::package-manager must be exactly 'npm' or 'yarn', got '${{ inputs.package-manager }}'"
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -42,19 +61,71 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
-          cache: npm
-          cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+          cache: ${{ inputs.package-manager == 'yarn' && 'yarn' || 'npm' }}
+          cache-dependency-path: ${{ inputs.working-directory }}/${{ inputs.package-manager == 'yarn' && 'yarn.lock' || 'package-lock.json' }}
 
+      # --- npm path (default; unchanged behavior for existing consumers) ---
       - name: Install dependencies
+        if: ${{ inputs.package-manager != 'yarn' }}
         run: npm ci
 
       - name: Lint
+        if: ${{ inputs.package-manager != 'yarn' }}
         run: npm run lint --if-present
 
       - name: Typecheck
-        if: ${{ !inputs.skip-typecheck }}
+        if: ${{ !inputs.skip-typecheck && inputs.package-manager != 'yarn' }}
         run: npm run typecheck --if-present
 
       - name: Test
-        if: ${{ !inputs.skip-test }}
+        if: ${{ !inputs.skip-test && inputs.package-manager != 'yarn' }}
         run: npm test --if-present
+
+      # --- yarn path ---
+      # Supported: yarn classic (v1), the runner default. Repos that pin a yarn
+      # version via package.json `packageManager` get that version at install
+      # time through corepack (under Berry, --frozen-lockfile is a deprecated
+      # alias for --immutable and still enforces the lockfile).
+      #
+      # yarn v1 has no --if-present, so each script step probes package.json
+      # first and runs the script only when it exists, preserving the npm
+      # `--if-present` no-op-when-absent semantics above. The probe uses
+      # `node -p` in a command substitution so a malformed/unreadable
+      # package.json FAILS the step instead of silently skipping the script.
+      - name: Enable corepack (yarn)
+        if: ${{ inputs.package-manager == 'yarn' }}
+        run: corepack enable
+
+      - name: Install dependencies (yarn)
+        if: ${{ inputs.package-manager == 'yarn' }}
+        run: yarn install --frozen-lockfile
+
+      - name: Lint (yarn)
+        if: ${{ inputs.package-manager == 'yarn' }}
+        run: |
+          HAS=$(node -p "Boolean((require('./package.json').scripts || {}).lint)")
+          if [ "$HAS" = "true" ]; then
+            yarn lint
+          else
+            echo "No lint script in package.json; skipping (yarn has no --if-present)."
+          fi
+
+      - name: Typecheck (yarn)
+        if: ${{ !inputs.skip-typecheck && inputs.package-manager == 'yarn' }}
+        run: |
+          HAS=$(node -p "Boolean((require('./package.json').scripts || {}).typecheck)")
+          if [ "$HAS" = "true" ]; then
+            yarn typecheck
+          else
+            echo "No typecheck script in package.json; skipping (yarn has no --if-present)."
+          fi
+
+      - name: Test (yarn)
+        if: ${{ !inputs.skip-test && inputs.package-manager == 'yarn' }}
+        run: |
+          HAS=$(node -p "Boolean((require('./package.json').scripts || {}).test)")
+          if [ "$HAS" = "true" ]; then
+            yarn test
+          else
+            echo "No test script in package.json; skipping (yarn has no --if-present)."
+          fi
