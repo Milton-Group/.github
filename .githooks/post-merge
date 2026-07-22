@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# Post-merge hook: after `git pull` on a long-lived branch, delete local
+# feature branches whose PR has merged — keeps the branch list from
+# accumulating merged garbage without a manual cleanup pass.
+#
+# post-merge fires after any successful `git merge`, including the
+# fast-forward `git pull` you run after a PR merges on GitHub. It acts only
+# when HEAD is a long-lived branch (main/master/dev/staging — the promotion
+# chain), and never deletes those branches themselves. (If you pull with
+# --rebase, post-merge never fires — clean up by hand.)
+#
+# Safety model — a branch is deleted ONLY when one of these proves it merged:
+#   1. `gh` says a MERGED PR's head branch has this name AND its head SHA
+#      equals the local tip (covers squash merges, one API call for all
+#      branches); or
+#   2. its upstream is gone after `fetch --prune` (GitHub deletes the remote
+#      branch on merge) AND its tip is an ancestor of the branch just pulled
+#      (covers regular merges when gh is unavailable).
+# Branches checked out in a worktree are never touched — remove the worktree
+# first (`git worktree remove`), then the branch. A gone-upstream branch that
+# can't be verified is skipped, never force-deleted: after a squash merge,
+# unpushed local commits exist nowhere else. Skips are summarized in one
+# line per category so a large backlog doesn't spam every pull.
+#
+# Enable hooks (one-time per clone):
+#   git config core.hooksPath .githooks
+#
+# Bypass: MILTON_SKIP_BRANCH_CLEANUP=1 git pull
+
+set -e
+
+if [ -n "${MILTON_SKIP_BRANCH_CLEANUP:-}" ]; then
+  exit 0
+fi
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+DEFAULT=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+DEFAULT=${DEFAULT:-main}
+PROTECTED=" $DEFAULT main master dev staging "
+
+case "$PROTECTED" in
+  *" $BRANCH "*) ;;
+  *) exit 0 ;;
+esac
+
+# The pull that triggered us already fetched, but not necessarily with
+# --prune; gone-upstream detection needs pruned remote-tracking refs.
+git fetch --prune --quiet origin 2>/dev/null || exit 0
+
+# One batched lookup: "<headRefName> <headRefOid>" per merged PR. Empty when
+# gh is missing or unauthenticated — the ancestry path still runs.
+MERGED_PRS=""
+if command -v gh >/dev/null 2>&1; then
+  # sort:updated-desc keeps the window tracking merge recency, not PR
+  # creation order — otherwise old-but-recently-merged PRs age out first.
+  MERGED_PRS=$(GH_NO_UPDATE_NOTIFIER=1 GH_PROMPT_DISABLED=1 \
+    gh pr list --limit 500 --search "is:merged sort:updated-desc" \
+    --json headRefName,headRefOid \
+    --jq '.[] | "\(.headRefName) \(.headRefOid)"' 2>/dev/null || true)
+fi
+
+WORKTREE_BRANCHES=" $(git worktree list --porcelain \
+  | awk '$1 == "branch" {sub("refs/heads/", "", $2); print $2}' | tr '\n' ' ')"
+
+WT_SKIPPED=""
+TIP_DIFFERS=""
+UNVERIFIED=""
+
+while read -r BR TIP TRACK; do
+  case "$PROTECTED" in
+    *" $BR "*) continue ;;
+  esac
+
+  MERGED_MATCH=""
+  if printf '%s\n' "$MERGED_PRS" | grep -qxF "$BR $TIP"; then
+    MERGED_MATCH=1
+  fi
+
+  case "$WORKTREE_BRANCHES" in
+    *" $BR "*)
+      if [ -n "$MERGED_MATCH" ] || [ "$TRACK" = "[gone]" ]; then
+        WT_SKIPPED="$WT_SKIPPED $BR"
+      fi
+      continue
+      ;;
+  esac
+
+  if [ -n "$MERGED_MATCH" ]; then
+    # -D, not -d: squash merges defeat -d's ancestry check; the PR-head
+    # match proved this exact tip is what merged.
+    if git branch -D "$BR" >/dev/null 2>&1; then
+      echo "→ post-merge: deleted merged branch $BR" >&2
+    else
+      echo "⚠  post-merge: could not delete $BR (git refused)" >&2
+    fi
+    continue
+  fi
+
+  # No PR-head match. Only gone-upstream branches (pushed, then deleted on
+  # the remote — GitHub's post-merge signature) get further treatment;
+  # everything else is work in progress and stays silently.
+  if [ "$TRACK" != "[gone]" ]; then
+    continue
+  fi
+
+  if git merge-base --is-ancestor "$BR" HEAD 2>/dev/null; then
+    if git branch -d "$BR" >/dev/null 2>&1; then
+      echo "→ post-merge: deleted merged branch $BR" >&2
+    else
+      echo "⚠  post-merge: could not delete $BR (git refused)" >&2
+    fi
+  elif printf '%s\n' "$MERGED_PRS" | cut -d' ' -f1 | grep -qxF "$BR"; then
+    TIP_DIFFERS="$TIP_DIFFERS $BR"
+  else
+    UNVERIFIED="$UNVERIFIED $BR"
+  fi
+done < <(git for-each-ref \
+  --format='%(refname:short) %(objectname) %(upstream:track)' refs/heads/)
+
+count() { echo $#; }
+
+if [ -n "$TIP_DIFFERS" ]; then
+  # shellcheck disable=SC2086
+  echo "⚠  post-merge: $(count $TIP_DIFFERS) branch(es) differ from their merged PR head — possible unpushed commits:$TIP_DIFFERS" >&2
+fi
+if [ -n "$WT_SKIPPED" ]; then
+  # shellcheck disable=SC2086
+  echo "→ post-merge: $(count $WT_SKIPPED) merged/gone branch(es) checked out in worktrees — remove the worktree first, then delete" >&2
+fi
+if [ -n "$UNVERIFIED" ]; then
+  # shellcheck disable=SC2086
+  echo "→ post-merge: $(count $UNVERIFIED) gone-upstream branch(es) couldn't be verified as merged — left for manual triage" >&2
+fi
+
+exit 0
