@@ -20,7 +20,7 @@ grants are immutable after creation, so one-off access = one-off SA.
    `ttl` like `8h`. If the vault or task is missing, ask — never guess a vault.
    The script refuses any vault whose name contains `prod` or `local-infra`
    (any case); don't work around that — those are attended-only. Placement
-   rules: `docs/SECRETS.md` in claude-template.
+   rules: `docs/SECRETS.md` in Milton-Group/harness.
 2. **Working dir**: default to the current repo root (this skill ships per-repo,
    so the run's repo is normally the one you're in). If the task targets a
    different repo, ask for the path.

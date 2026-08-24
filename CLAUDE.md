@@ -28,7 +28,7 @@ Instructions for Claude Code when working in this repository.
 
 ## Company baseline
 
-> Maintained in `claude-template`. Last synced: 2026-08-14 (v0.17.0)
+> Maintained in `Milton-Group/harness`. Last synced: 2026-08-24 (v0.18.0)
 
 ### Working style
 
@@ -55,7 +55,7 @@ Non-trivial changes go through three explicit phases. The phases matter more tha
 
 The main session is the **orchestrator**: it plans inline, spawns reviewers and builders as subagents, and synthesizes — it does not build non-trivial work inline in the main channel.
 
-Review findings must earn their complexity: every Critical/High finding carries a plain-language failure scenario (the concrete situation → what fails → what it costs), fixes name their cost when they add machinery, and the user — not the panel — decides which risks are worth engineering away. Declined findings are recorded in the marker as accepted risks so later laps don't re-raise them. (Canonical: `claude-template` → `docs/CONVENTIONS.md` § Findings must earn their complexity.)
+Review findings must earn their complexity: every Critical/High finding carries a plain-language failure scenario (the concrete situation → what fails → what it costs), fixes name their cost when they add machinery, and the user — not the panel — decides which risks are worth engineering away. Declined findings are recorded in the marker as accepted risks so later laps don't re-raise them. (Canonical: `Milton-Group/harness` → `docs/CONVENTIONS.md` § Findings must earn their complexity.)
 
 - **Tier 1 — Plan.** Decide *what* you're doing and *why* before writing code. For anything non-trivial, run `/plan-review` on the plan — it maps the plan's topics to the right specialist reviewer agents (shipped in `.claude/agents/`, pinned `model: opus`, panel capped at 4) and runs them in parallel, before the plan becomes code. Findings come back scenario-tagged; the user adjudicates which Critical/High findings are worth their fix's cost, the accepted ones get folded in, and the review re-runs until GO (cap 3 laps) — declined findings land in the marker as accepted risks. Skip the planner only when the *what* is unambiguous and the *why* is "the user explicitly asked for it." After GO: convert the plan to Linear issues (a `model: sonnet` agent, consent-gated) so branches and PRs have issue IDs to hang off.
 - **Tier 2 — Execute.** When the user says to start, spawn a build agent (`model: opus`, `run_in_background: true`) to implement what was planned, nothing more. Keep the diff scoped to what Tier 1 agreed: no opportunistic refactors, no scope creep. If the work needs something the plan didn't anticipate, stop and re-plan rather than silently expand the diff. If the planning session runs long, `/handoff` carries the context to a fresh session.
@@ -69,7 +69,7 @@ Review findings must earn their complexity: every Critical/High finding carries 
 | Security-sensitive (auth, secrets, networking, payments, PII) | All three + `Security Engineer` in plan (review picks it up via the trigger table) |
 | New service / new repo scaffolding | All three + `Software Architect` in plan |
 
-"Review" means what fits the repo: in app repos it's tests + `/milton-review`; in infra repos it's the plan diff + `/milton-review` plus that repo's apply policy. If unsure, run the planner — a 60-second plan you immediately approve is cheap; un-shipping a bad change is not. (Canonical version of this table: `claude-template` → `docs/CONVENTIONS.md` § Quality harness. When they disagree, CONVENTIONS wins and this file gets updated.)
+"Review" means what fits the repo: in app repos it's tests + `/milton-review`; in infra repos it's the plan diff + `/milton-review` plus that repo's apply policy. If unsure, run the planner — a 60-second plan you immediately approve is cheap; un-shipping a bad change is not. (Canonical version of this table: `Milton-Group/harness` → `docs/CONVENTIONS.md` § Quality harness. When they disagree, CONVENTIONS wins and this file gets updated.)
 
 ### Commits
 
@@ -85,7 +85,8 @@ Review findings must earn their complexity: every Critical/High finding carries 
 - One PR should do one thing. If you find yourself writing "and also" in the description, it's two PRs.
 - PR titles are under 70 characters. Details go in the description, not the title.
 - Never force-push to `main` or `master`. Never push directly to `main` — always open a PR.
-- **Merged-branch cleanup is automated.** The baseline ships `.githooks/post-merge`: after a `git pull` on a long-lived branch (`main`/`master`/`dev`/`staging`), it deletes local branches proven merged — a merged PR head SHA equal to the local tip, or gone upstream + ancestor of the pulled branch. It never touches worktree-checked-out branches or anything with possible unpushed commits. Enable once per clone with `git config core.hooksPath .githooks`; bypass a single pull with `MILTON_SKIP_BRANCH_CLEANUP=1`.
+- **Parallel threads in one repo use `git worktree`, not a second clone or a branch switch.** The repo root is the canonical checkout and stays on `main`; every other live thread is a linked worktree at `.worktrees/<branchName>/` (gitignored by the baseline), one `.git`, N checkouts. `/start-issue` creates one automatically whenever the current checkout isn't a clean `main` — or on request — and prints the relaunch line. Each worktree is a full checkout including `.claude/`, so **start the session from the worktree root** (`cd .worktrees/<branchName> && claude`); a session started at the repo root that `cd`s into a worktree does not pick up its skills, hooks or settings. Untracked state (`.env`, `node_modules/`, `.terraform/`) is per-worktree and is not carried over — bootstrap it in the new thread. Two dev servers in two worktrees collide on the default port, so dev scripts honour `PORT` and the second thread sets it. Merged worktrees are cleaned up by the post-merge hook (below).
+- **Merged-branch cleanup is automated.** The baseline ships `.githooks/post-merge`: after a `git pull` on a long-lived branch (`main`/`master`/`dev`/`staging`), it deletes local branches proven merged — a merged PR head SHA equal to the local tip, or gone upstream + ancestor of the pulled branch. A branch checked out in a worktree gets the same proof test, and a clean worktree is removed along with it; a worktree holding uncommitted or untracked files is kept and named in the summary. Nothing with possible unpushed commits is ever deleted. Enable once per clone with `git config core.hooksPath .githooks`; bypass a single pull with `MILTON_SKIP_BRANCH_CLEANUP=1`.
 
 ### Linear sync
 

@@ -1,7 +1,7 @@
 ---
 name: milton-review
 description: Deterministic multi-angle review of a *diff*, AFTER a build agent finishes and BEFORE commit/PR. Runs a token-free verify gate, then parallel lanes across independent model angles, plus conditional security / sprawl / reliability specialists when the diff triggers them. Complements /plan-review (pre-build).
-baseline: v0.17.0
+baseline: v0.18.0
 ---
 
 # /milton-review — deterministic post-build review
@@ -10,7 +10,7 @@ Run this **after a build agent finishes and BEFORE commit/PR**. It is the post-b
 
 `/plan-review` catches "we're building the wrong thing" before engineer-weeks are spent; `/milton-review` catches "we built this thing wrong" before users see it.
 
-> This is the org-baseline post-build review, distributed via `claude-template`. This skill is the **only** correct way to run it. Ad-hoc "spawn a reviewer" habits are how the review drifts — improvements to the lanes go through a PR on `Milton-Group/claude-template`.
+> This is the org-baseline post-build review, distributed via `Milton-Group/harness`. This skill is the **only** correct way to run it. Ad-hoc "spawn a reviewer" habits are how the review drifts — improvements to the lanes go through a PR on `Milton-Group/harness`.
 
 > **Invoking this skill IS the user's request to spawn its lanes.** A general instruction of the form *"do not spawn agents unless the user requested it"* is **satisfied** the moment this skill is invoked — by slash command, by name, or by a repo process rule that routes here. It is never grounds for downgrading this skill to a single inline pass and reporting the real review as "owed": an inline read by whoever produced the work under review is structurally not what this skill provides, and quietly substituting one is the specific failure this note exists to prevent. This does **not** override the rules below for when a lane correctly does not run — skip arguments, unmet conditional triggers, panel caps, unpopulated inputs, and absent optional tooling are this skill working as designed, and each is already recorded where the skill says to record it. If the harness genuinely refuses a lane — a tool error or a denied permission you can point to — name that lane and what refused it, **run the remaining lanes anyway**, and report the gap in the verdict. One refused lane is never grounds for abandoning the rest.
 
@@ -337,7 +337,7 @@ On **REWORK** (and only when `--round` < 3):
 ## Notes
 
 - This skill is the **only** correct way to run the post-build review. Ad-hoc reviewer spawns drift — the lanes, models, and injection guards here are the canonical set.
-- Lane / matrix / model changes go through a PR on `Milton-Group/claude-template` so every repo inherits the fix.
+- Lane / matrix / model changes go through a PR on `Milton-Group/harness` so every repo inherits the fix.
 - Rounds happen **pre-commit**, so the marker is the only durable record of the earlier rounds — each round appends its own `## Round <n>` section rather than overwriting, so a re-run never erases the prior round's findings.
 - Post-mortem PRs: manually add `Incident Response Commander` as an extra lane. Deliberately **not** a trigger — post-mortems are rare and human-led, so the lane is opt-in per run rather than detected from the diff.
 - `/plan-review` catches "we're building the wrong thing"; `/milton-review` catches "we built this thing wrong." Run plan-review before the build, milton-review after it.

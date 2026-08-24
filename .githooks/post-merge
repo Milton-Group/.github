@@ -16,11 +16,17 @@
 #   2. its upstream is gone after `fetch --prune` (GitHub deletes the remote
 #      branch on merge) AND its tip is an ancestor of the branch just pulled
 #      (covers regular merges when gh is unavailable).
-# Branches checked out in a worktree are never touched — remove the worktree
-# first (`git worktree remove`), then the branch. A gone-upstream branch that
-# can't be verified is skipped, never force-deleted: after a squash merge,
-# unpushed local commits exist nowhere else. Skips are summarized in one
-# line per category so a large backlog doesn't spam every pull.
+# A branch checked out in a worktree (the house layout is
+# .worktrees/<branch>/, see CONVENTIONS § Git & branching) gets the same
+# proof test; when it passes, the worktree is removed first and then the
+# branch. `git worktree remove` is run WITHOUT --force, so a worktree holding
+# modified or untracked files (a stray .env, an unstaged edit) refuses and
+# the branch is kept — the proof already rules out unpushed commits, and the
+# refusal rules out uncommitted ones. Stale worktree records are pruned at
+# the end. A gone-upstream branch that can't be verified is skipped, never
+# force-deleted: after a squash merge, unpushed local commits exist nowhere
+# else. Skips are summarized in one line per category so a large backlog
+# doesn't spam every pull.
 #
 # Enable hooks (one-time per clone):
 #   git config core.hooksPath .githooks
@@ -59,8 +65,19 @@ if command -v gh >/dev/null 2>&1; then
     --jq '.[] | "\(.headRefName) \(.headRefOid)"' 2>/dev/null || true)
 fi
 
-WORKTREE_BRANCHES=" $(git worktree list --porcelain \
-  | awk '$1 == "branch" {sub("refs/heads/", "", $2); print $2}' | tr '\n' ' ')"
+# "<branch> <path>" per linked worktree that has a branch checked out. The
+# main worktree is listed too, but its branch is HEAD, which is protected and
+# never reaches the loop; detached worktrees have no branch line and are
+# ignored. Paths containing spaces are unsupported by this mapping — such a
+# worktree falls through to the plain-branch path, where `git branch -d/-D`
+# refuses because the branch is checked out.
+WORKTREE_MAP="$(git worktree list --porcelain \
+  | awk '$1 == "worktree" {path = $2}
+         $1 == "branch"   {sub("refs/heads/", "", $2); print $2, path}')"
+
+worktree_path() { # worktree_path <branch> — empty when not checked out anywhere
+  printf '%s\n' "$WORKTREE_MAP" | awk -v br="$1" '$1 == br {print $2; exit}'
+}
 
 WT_SKIPPED=""
 TIP_DIFFERS=""
@@ -76,19 +93,36 @@ while read -r BR TIP TRACK; do
     MERGED_MATCH=1
   fi
 
-  case "$WORKTREE_BRANCHES" in
-    *" $BR "*)
-      if [ -n "$MERGED_MATCH" ] || [ "$TRACK" = "[gone]" ]; then
-        WT_SKIPPED="$WT_SKIPPED $BR"
-      fi
-      continue
-      ;;
-  esac
+  WT_PATH="$(worktree_path "$BR")"
 
+  # Establish the proof first; the worktree (if any) is only removed for a
+  # branch that would be deleted anyway.
+  DELETE_FLAG=""
   if [ -n "$MERGED_MATCH" ]; then
     # -D, not -d: squash merges defeat -d's ancestry check; the PR-head
     # match proved this exact tip is what merged.
-    if git branch -D "$BR" >/dev/null 2>&1; then
+    DELETE_FLAG="-D"
+  elif [ "$TRACK" = "[gone]" ] && git merge-base --is-ancestor "$BR" HEAD 2>/dev/null; then
+    DELETE_FLAG="-d"
+  fi
+
+  if [ -n "$DELETE_FLAG" ]; then
+    if [ -n "$WT_PATH" ]; then
+      # No --force: git refuses a worktree with modified or untracked files,
+      # or one that is locked, and that refusal is the dirty-worktree guard.
+      if ! git worktree remove "$WT_PATH" >/dev/null 2>&1; then
+        WT_SKIPPED="$WT_SKIPPED $BR"
+        continue
+      fi
+      echo "→ post-merge: removed clean worktree $WT_PATH" >&2
+      # A slashed branch (user/milton-123-slug) leaves .worktrees/user/
+      # behind; drop empty parents up to .worktrees/ itself. Best effort.
+      PARENT=$(dirname "$WT_PATH")
+      while [ "$(basename "$PARENT")" != ".worktrees" ] && rmdir "$PARENT" 2>/dev/null; do
+        PARENT=$(dirname "$PARENT")
+      done
+    fi
+    if git branch "$DELETE_FLAG" "$BR" >/dev/null 2>&1; then
       echo "→ post-merge: deleted merged branch $BR" >&2
     else
       echo "⚠  post-merge: could not delete $BR (git refused)" >&2
@@ -103,13 +137,8 @@ while read -r BR TIP TRACK; do
     continue
   fi
 
-  if git merge-base --is-ancestor "$BR" HEAD 2>/dev/null; then
-    if git branch -d "$BR" >/dev/null 2>&1; then
-      echo "→ post-merge: deleted merged branch $BR" >&2
-    else
-      echo "⚠  post-merge: could not delete $BR (git refused)" >&2
-    fi
-  elif printf '%s\n' "$MERGED_PRS" | cut -d' ' -f1 | grep -qxF "$BR"; then
+  # Gone upstream but not an ancestor (the ancestor case was handled above).
+  if printf '%s\n' "$MERGED_PRS" | cut -d' ' -f1 | grep -qxF "$BR"; then
     TIP_DIFFERS="$TIP_DIFFERS $BR"
   else
     UNVERIFIED="$UNVERIFIED $BR"
@@ -125,11 +154,15 @@ if [ -n "$TIP_DIFFERS" ]; then
 fi
 if [ -n "$WT_SKIPPED" ]; then
   # shellcheck disable=SC2086
-  echo "→ post-merge: $(count $WT_SKIPPED) merged/gone branch(es) checked out in worktrees — remove the worktree first, then delete" >&2
+  echo "→ post-merge: $(count $WT_SKIPPED) merged branch(es) kept — their worktrees hold uncommitted or untracked files (or are locked):$WT_SKIPPED" >&2
+  echo "   commit/stash or discard, then: git worktree remove <path> && git branch -d <branch>" >&2
 fi
 if [ -n "$UNVERIFIED" ]; then
   # shellcheck disable=SC2086
   echo "→ post-merge: $(count $UNVERIFIED) gone-upstream branch(es) couldn't be verified as merged — left for manual triage" >&2
 fi
+
+# Drop records for worktrees whose directories were deleted by hand.
+git worktree prune 2>/dev/null || true
 
 exit 0

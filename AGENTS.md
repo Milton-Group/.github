@@ -28,9 +28,9 @@ Instructions for Codex when working in this repository.
 
 ## Company baseline
 
-> Maintained in `claude-template`. Last synced: 2026-08-14 (v0.17.0)
+> Maintained in `Milton-Group/harness`. Last synced: 2026-08-24 (v0.18.0)
 
-This section is authored for Codex. It is **not** a substitution pass over the Claude-facing `CLAUDE.md` — where the two files differ on harness mechanics, each is correct for its own runtime. Where they differ on *policy* (commits, branches, Linear, safety), they are meant to agree, and `docs/CONVENTIONS.md` in `claude-template` is canonical for both.
+This section is authored for Codex. It is **not** a substitution pass over the Claude-facing `CLAUDE.md` — where the two files differ on harness mechanics, each is correct for its own runtime. Where they differ on *policy* (commits, branches, Linear, safety), they are meant to agree, and `docs/CONVENTIONS.md` in `Milton-Group/harness` is canonical for both.
 
 ### Your two modes
 
@@ -61,7 +61,7 @@ This repo carries harness trees for more than one agent. Yours are:
 **`.claude/` is Claude Code's tree, not yours** — subagents as `.md` with YAML frontmatter, skills that assume Claude's tool names and `model:` pins. Read it freely; in Mode 2 you may have to. But in **both** modes:
 
 - **Never execute `.claude/skills/**` as a workflow.** Those files name Claude models (`opus`, `fable`, `sonnet`) and Claude tools. Following them makes you improvise a runtime you don't have. Reading such a file to understand or review it is fine — treating its steps as your instructions is not. If a `.claude/` skill describes something genuinely useful, say so and let a human decide.
-- **Never write anything under `.claude/`.** Not markers, not settings, not fixes — unless the diff you were asked to *author* is itself a change to that tree, which only happens in Mode 1 and only when the user asked for it. Otherwise: that tree is maintained by `bootstrap.sh` from the `claude-template` baseline, so stray local edits get reverted and are invisible to review.
+- **Never write anything under `.claude/`.** Not markers, not settings, not fixes — unless the diff you were asked to *author* is itself a change to that tree, which only happens in Mode 1 and only when the user asked for it. Otherwise: that tree is maintained by `bootstrap.sh` from the `Milton-Group/harness` baseline, so stray local edits get reverted and are invisible to review.
 - **Ignore `model:` pins wherever you find them.** You do not select models by name. A pin is an instruction to a different runtime; it is not a task for you. Reviewing whether a pin is *correct* is still fair game in Mode 2.
 
 ### Working style
@@ -103,7 +103,7 @@ Non-trivial changes go through three explicit phases. The phases matter more tha
 
 **On review depth.** This repo may carry multi-lane review skills under `.agents/skills/` (`plan-review`, `milton-review` and kin). They are real and, in **Mode 1**, they are yours to run — but they are **expensive**, and they are opt-in. Run one when the user asks for it by name, or when you have proposed it and they agreed. Do **not** fan out into a review harness because the task text happened to resemble a review request; a scoped task deserves a scoped answer. If you think a change warrants the full harness, say so in one line and wait. In **Mode 2**, never start one — you *are* a lane in someone else's harness.
 
-"Review" means what fits the repo: in app repos it's tests plus a read of the diff; in infra repos it's the plan diff plus that repo's apply policy. If unsure, plan first — a 60-second plan you immediately approve is cheap; un-shipping a bad change is not. (Canonical version of this table: `claude-template` → `docs/CONVENTIONS.md` § Quality harness. When they disagree, CONVENTIONS wins and this file gets updated.)
+"Review" means what fits the repo: in app repos it's tests plus a read of the diff; in infra repos it's the plan diff plus that repo's apply policy. If unsure, plan first — a 60-second plan you immediately approve is cheap; un-shipping a bad change is not. (Canonical version of this table: `Milton-Group/harness` → `docs/CONVENTIONS.md` § Quality harness. When they disagree, CONVENTIONS wins and this file gets updated.)
 
 ### Commits
 
@@ -119,7 +119,8 @@ Non-trivial changes go through three explicit phases. The phases matter more tha
 - One PR should do one thing. If you find yourself writing "and also" in the description, it's two PRs.
 - PR titles are under 70 characters. Details go in the description, not the title.
 - Never force-push to `main` or `master`. Never push directly to `main` — always open a PR.
-- **Merged-branch cleanup is automated.** The baseline ships `.githooks/post-merge`: after a `git pull` on a long-lived branch (`main`/`master`/`dev`/`staging`), it deletes local branches proven merged — a merged PR head SHA equal to the local tip, or gone upstream + ancestor of the pulled branch. It never touches worktree-checked-out branches or anything with possible unpushed commits. Enable once per clone with `git config core.hooksPath .githooks`; bypass a single pull with `MILTON_SKIP_BRANCH_CLEANUP=1`.
+- **Parallel threads in one repo use `git worktree`, not a second clone or a branch switch.** The repo root is the canonical checkout and stays on `main`; every other live thread is a linked worktree at `.worktrees/<branchName>/` (gitignored by the baseline), one `.git`, N checkouts. `/start-issue` creates one automatically whenever the current checkout isn't a clean `main` — or on request — and prints the relaunch line. Each worktree is a full checkout including `.claude/`, so **start the session from the worktree root** (`cd .worktrees/<branchName> && claude`); a session started at the repo root that `cd`s into a worktree does not pick up its skills, hooks or settings. Untracked state (`.env`, `node_modules/`, `.terraform/`) is per-worktree and is not carried over — bootstrap it in the new thread. Two dev servers in two worktrees collide on the default port, so dev scripts honour `PORT` and the second thread sets it. Merged worktrees are cleaned up by the post-merge hook (below).
+- **Merged-branch cleanup is automated.** The baseline ships `.githooks/post-merge`: after a `git pull` on a long-lived branch (`main`/`master`/`dev`/`staging`), it deletes local branches proven merged — a merged PR head SHA equal to the local tip, or gone upstream + ancestor of the pulled branch. A branch checked out in a worktree gets the same proof test, and a clean worktree is removed along with it; a worktree holding uncommitted or untracked files is kept and named in the summary. Nothing with possible unpushed commits is ever deleted. Enable once per clone with `git config core.hooksPath .githooks`; bypass a single pull with `MILTON_SKIP_BRANCH_CLEANUP=1`.
 
 ### Linear sync
 
