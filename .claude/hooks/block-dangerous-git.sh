@@ -268,7 +268,7 @@ PYEOF
 )" && rc=0 || rc=$?
 
 if [ "${rc:-0}" -eq 2 ]; then
-  echo "Blocked by claude-template hook: ${reason}" >&2
+  echo "Blocked by Milton-Group/harness hook: ${reason}" >&2
   echo "If you truly need this, run it yourself in the terminal — don't work around the hook." >&2
   exit 2
 fi

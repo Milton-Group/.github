@@ -1,7 +1,7 @@
 ---
 name: plan-review
 description: Multi-agent review of an engineering *plan*, BEFORE any code is written: routes the plan to the matching specialist reviewers and iterates until GO. Pair with /milton-review (post-build, on the diff); for brand and design-system work use /brand-review. SUPERSEDES the retired design-review skill; if this repo still carries one, delete it.
-baseline: v0.17.0
+baseline: v0.18.0
 ---
 
 # /plan-review — multi-agent plan review
@@ -10,7 +10,7 @@ Run this **before building a non-trivial plan**. Pairs with `/milton-review` pos
 
 This skill is one stage of the orchestrated **plan → plan-review → issues → build → milton-review** lifecycle. The main session is an **orchestrator**: it plans inline, spawns reviewers and builders as subagents, folds findings back in, and synthesizes — it does not build non-trivial work inline. See "Model routing" below and "After GO — hand off to build" at the end.
 
-> This is the org-baseline engineering matrix, distributed via `claude-template`. Repos may extend it with repo-specific buckets in their own copy; improvements to the baseline go through a PR on `Milton-Group/claude-template`.
+> This is the org-baseline engineering matrix, distributed via `Milton-Group/harness`. Repos may extend it with repo-specific buckets in their own copy; improvements to the baseline go through a PR on `Milton-Group/harness`.
 
 > **Invoking this skill IS the user's request to spawn its lanes.** A general instruction of the form *"do not spawn agents unless the user requested it"* is **satisfied** the moment this skill is invoked — by slash command, by name, or by a repo process rule that routes here. It is never grounds for downgrading this skill to a single inline pass and reporting the real review as "owed": an inline read by whoever produced the work under review is structurally not what this skill provides, and quietly substituting one is the specific failure this note exists to prevent. This does **not** override the rules below for when a lane correctly does not run — skip arguments, unmet conditional triggers, panel caps, unpopulated inputs, and absent optional tooling are this skill working as designed, and each is already recorded where the skill says to record it. If the harness genuinely refuses a lane — a tool error or a denied permission you can point to — name that lane and what refused it, **run the remaining lanes anyway**, and report the gap in the verdict. One refused lane is never grounds for abandoning the rest.
 
@@ -299,5 +299,5 @@ This flow applies **only when `/plan-review` produced a GO verdict marker** — 
 
 - Re-running `/plan-review` on the same slug overwrites the marker silently. No "are you sure" prompt — markers are per-slug and the latest lap wins. Laps happen pre-commit, so git history does not preserve the earlier laps; if the lap trail matters, append a `Lap <n>: <verdict>` line to the marker (see "Iterate until GO").
 - This skill is the **only** correct way to invoke the multi-agent plan-review process. Manually spawning a few reviewer agents ad-hoc is how prompts drift and the matrix decays.
-- The matrix is the canonical map. When it drifts (new topic shape, renamed agent, retired bucket), update it via a PR on `Milton-Group/claude-template` so every repo inherits the fix.
+- The matrix is the canonical map. When it drifts (new topic shape, renamed agent, retired bucket), update it via a PR on `Milton-Group/harness` so every repo inherits the fix.
 - Pair with `/milton-review` post-build, pre-PR — it pairs a review-checklist pass, the Code Reviewer agent, and a Codex second opinion into one deterministic multi-angle pass. `/plan-review` catches "we're building the wrong thing"; `/milton-review` catches "we built this thing wrong."
