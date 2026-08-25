@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email **security@milton.co**. For internal reports you may also DM Chinedum on Slack.
+Email **security@almalabs.app**. For internal reports you may also message Chinedum directly on Feishu.
 
 Please **do not** open a public GitHub issue for security reports.
 
