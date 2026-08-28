@@ -10,13 +10,13 @@ Milton partners with makers and builders to replace what depletes with what sust
 
 ## Start here
 
-| If you are… | Read |
+| What do you need? | Read |
 |---|---|
-| **A new engineer at Milton** | [Your first PR](https://github.com/Milton-Group/claude-template/blob/main/docs/ONBOARDING.md) — the engineering loop, EN + 中文 |
-| **Setting up your dev environment** (engineer or not) | [Coder setup](https://dev-onboarding.milton.co/) — workspace + Claude Code, EN + 中文 |
-| **Working in a Milton repo** | [Conventions](https://github.com/Milton-Group/claude-template/blob/main/docs/CONVENTIONS.md) — commits, branches, PRs |
-| **Operating Milton infra** | [Architecture](https://github.com/Milton-Group/infra/blob/main/ARCHITECTURE.md) · [Incident response](https://github.com/Milton-Group/infra/blob/main/docs/INCIDENT-RESPONSE.md) |
-| **A visitor** | Our public site at [milton.co](https://milton.co) |
+| **Set up your dev workspace** — all new employees start here | [Coder setup](https://dev-onboarding.milton.co/) — EN + 中文 |
+| **Ship your first PR** | [The engineering loop](https://github.com/Milton-Group/claude-template/blob/main/docs/ONBOARDING.md) — EN + 中文 |
+| **Look up a convention** — commits, branches, PRs | [Conventions](https://github.com/Milton-Group/claude-template/blob/main/docs/CONVENTIONS.md) |
+| **Operate or change Milton infrastructure** | [Architecture](https://github.com/Milton-Group/infra/blob/main/ARCHITECTURE.md) · [Incident response](https://github.com/Milton-Group/infra/blob/main/docs/INCIDENT-RESPONSE.md) |
+| **Just learning what Milton does** — no account needed | Our public site at [milton.co](https://milton.co) |
 
 Most links above point to private repos and need Milton-Group org membership to read. If you're an external visitor, the public site has the introduction.
 
@@ -47,13 +47,13 @@ Milton 与 makers 和 builders 合作,用可持续的方式替换被消耗的事
 
 ## 从这里开始
 
-| 如果你是… | 阅读 |
+| 你需要什么？| 阅读 |
 |---|---|
-| **Milton 的新工程师** | [第一次提交 PR](https://github.com/Milton-Group/claude-template/blob/main/docs/ONBOARDING.md) —— 开发循环,EN + 中文 |
-| **正在设置开发环境**(无论是否工程师) | [Coder 设置](https://dev-onboarding.milton.co/) —— 工作区 + Claude Code,EN + 中文 |
-| **在 Milton 仓库中工作** | [约定](https://github.com/Milton-Group/claude-template/blob/main/docs/CONVENTIONS.md) —— 提交、分支、PR |
-| **运维 Milton 基础设施** | [架构](https://github.com/Milton-Group/infra/blob/main/ARCHITECTURE.md) · [事件响应](https://github.com/Milton-Group/infra/blob/main/docs/INCIDENT-RESPONSE.md) |
-| **访客** | 公开网站 [milton.co](https://milton.co) |
+| **设置你的开发工作区** —— 所有新员工从这里开始 | [Coder 设置](https://dev-onboarding.milton.co/) —— EN + 中文 |
+| **提交你的第一个 PR** | [开发循环](https://github.com/Milton-Group/claude-template/blob/main/docs/ONBOARDING.md) —— EN + 中文 |
+| **查阅某项约定** —— 提交、分支、PR | [约定](https://github.com/Milton-Group/claude-template/blob/main/docs/CONVENTIONS.md) |
+| **运维或修改 Milton 基础设施** | [架构](https://github.com/Milton-Group/infra/blob/main/ARCHITECTURE.md) · [事件响应](https://github.com/Milton-Group/infra/blob/main/docs/INCIDENT-RESPONSE.md) |
+| **只想了解 Milton 做什么** —— 无需账号 | 公开网站 [milton.co](https://milton.co) |
 
 上方多数链接指向私有仓库,需要 Milton-Group 组织成员资格。外部访客可访问公开网站获取介绍。
 
